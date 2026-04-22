@@ -4,12 +4,13 @@ Ce dossier contient un système d'agents orchestrés pour automatiser le cycle c
 
 ## Architecture du Système
 
-Le système est composé de **7 agents** travaillant ensemble dans un workflow orchestré :
+Le système est composé de **6 agents spécialisés** et **2 orchestrateurs** travaillant ensemble :
 
+### Option 1 : Feature Flow (Workflow Complet)
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                      Feature Flow                                │
-│                    (Orchestrateur)                               │
+│                (Orchestrateur Complet)                           │
 │                   user-invocable: true                           │
 └─────────────────────────────────────────────────────────────────┘
                               │
@@ -32,6 +33,35 @@ Le système est composé de **7 agents** travaillant ensemble dans un workflow o
                        └──────────┘   └──────────┘      │              │
                             │                            │              │
                             └─► Approve ────►────────────┴─► Merge ────┘
+```
+
+### Option 2 : Quick Flow (Workflow Rapide)
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Quick Flow                                  │
+│               (Orchestrateur Simplifié)                          │
+│                   user-invocable: true                           │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ├─ Invoke ──┐
+                              │            │
+        ┌─────────────────────┼────────────┤
+        │                     │            │
+        ▼                     ▼            ▼
+  ┌──────────┐         ┌──────────┐  ┌──────────────┐
+  │ Feature  │         │Developer │  │ Direct       │
+  │ Planner  │         │          │  │ Commit       │
+  └──────────┘         └──────────┘  │ (no PR)      │
+       │                    ▲         └──────────────┘
+       └─► Plan ─►──────────┤              ▲
+                            │              │
+                            ▼              │
+                       ┌──────────┐   ┌──────────┐
+                       │    QA    │◄──┤ Feedback │
+                       │ Analyst  │   │  Loop    │
+                       └──────────┘   └──────────┘
+                            │
+                            └─► Approve ────► Commit ────┘
 ```
 
 ## Les Agents
@@ -69,11 +99,21 @@ Le système est composé de **7 agents** travaillant ensemble dans un workflow o
 - **Invocable** : Non (uniquement via orchestrateur)
 
 ### 7. **Feature Flow (Orchestrator)** ([orchestrator.agent.md](orchestrator.agent.md))
-- **Rôle** : Coordonne tous les agents, gère les boucles de feedback
+- **Rôle** : Coordonne tous les agents pour un workflow complet avec PR et déploiement
 - **Outils** : `agent` (peut invoquer les autres agents)
-- **Invocable** : **OUI** (c'est le seul que l'utilisateur peut appeler directement)
+- **Invocable** : **OUI**
+- **Workflow** : Planning → Dev → QA → PR Creation → PR Review → Deployment
 
-## Workflow Complet
+### 8. **Quick Flow (Orchestrator Simplifié)** ([quick-flow.agent.md](quick-flow.agent.md))
+- **Rôle** : Workflow rapide sans PR ni revue - commit direct
+- **Outils** : `agent`, `execute`
+- **Invocable** : **OUI**
+- **Workflow** : Planning → Dev → QA → Direct Commit
+- **⚡ Use case** : Quand on est pressé, prototypage, petites features
+
+## Workflows Disponibles
+
+### Workflow Feature Flow (Complet)
 
 ```
 1. Planning
@@ -103,6 +143,27 @@ Le système est composé de **7 agents** travaillant ensemble dans un workflow o
    └─► Deployer merge et déploie sur GitHub Pages
 ```
 
+### Workflow Quick Flow (Rapide)
+
+```
+1. Planning
+   └─► Feature Planner crée le plan
+
+2. Development
+   └─► Developer implémente le plan
+
+3. Quality Assurance (avec boucle)
+   ├─► QA Analyst revoit le code et teste
+   ├─► Si CHANGES REQUIRED:
+   │   ├─► Developer corrige
+   │   └─► Retour à QA Analyst
+   └─► Si APPROVED: continuer
+
+4. Direct Commit
+   └─► Orchestrator commit directement sur la branche courante
+   └─► Pas de PR, pas de review, pas de déploiement
+```
+
 ## Boucles de Feedback
 
 ### Boucle QA ↔ Developer
@@ -121,23 +182,49 @@ Le système est composé de **7 agents** travaillant ensemble dans un workflow o
 
 ### Pour l'utilisateur humain
 
-Invoquez uniquement l'agent **Feature Flow** (orchestrateur) :
+Vous pouvez invoquer l'un des deux orchestrateurs selon vos besoins :
 
+#### Option 1 : Feature Flow (Workflow complet)
 ```
 @workspace /invoke Feature Flow
 
 "Ajouter un système de power-ups dans le jeu"
 ```
+**Quand l'utiliser :**
+- ✅ Développement en équipe
+- ✅ Features importantes nécessitant review
+- ✅ Déploiement sur GitHub Pages requis
+- ✅ Workflow PR standard
 
-L'orchestrateur gérera automatiquement tous les autres agents.
+#### Option 2 : Quick Flow (Workflow rapide)
+```
+@workspace /invoke Quick Flow
 
-### Ce que fait l'orchestrateur
+"Ajouter un système de power-ups dans le jeu"
+```
+**Quand l'utiliser :**
+- ⚡ Besoin de livrer vite
+- ⚡ Petites features ou bug fixes
+- ⚡ Développement solo
+- ⚡ Prototypage ou expérimentation
+- ⚡ Commits directs acceptables
 
+### Ce que fait chaque orchestrateur
+
+**Feature Flow :**
 1. Analyse votre demande
 2. Invoque les agents dans le bon ordre
 3. Gère les boucles de feedback automatiquement
-4. Vous tient informé de la progression
-5. Vous donne l'URL finale de déploiement
+4. Crée une PR et la fait reviewer
+5. Merge et déploie sur GitHub Pages
+6. Vous donne l'URL finale de déploiement
+
+**Quick Flow :**
+1. Analyse votre demande
+2. Invoque Planning → Dev → QA
+3. Gère la boucle de feedback QA ↔ Dev
+4. Commit directement (pas de PR)
+5. Vous laisse le contrôle pour push quand vous voulez
 
 ## Sécurités
 
@@ -158,7 +245,8 @@ Chaque agent a accès uniquement aux outils dont il a besoin :
 | PR Creator | ✅ | ❌ | ✅ | ✅ | ❌ |
 | PR Reviewer | ✅ | ❌ | ✅ | ✅ | ❌ |
 | Deployer | ✅ | ❌ | ❌ | ✅ | ❌ |
-| **Orchestrator** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Feature Flow** | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **Quick Flow** | ❌ | ❌ | ❌ | ✅ | ✅ |
 
 ## Exemple de Session
 
