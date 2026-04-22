@@ -70,7 +70,16 @@ export class MainMenu extends Scene
             shootemUpButton.setColor('#ffffff');
         });
 
-        shootemUpButton.on('pointerdown', () => {
+        shootemUpButton.on('pointerdown', (pointer, localX, localY, event) => {
+            event.stopPropagation(); // Prevent the click from reaching the scene's general handler
+            
+            // Stop logo animation before transitioning (consistency with changeScene)
+            if (this.logoTween)
+            {
+                this.logoTween.stop();
+                this.logoTween = null;
+            }
+            
             this.scene.start('ShootemUp');
         });
 
