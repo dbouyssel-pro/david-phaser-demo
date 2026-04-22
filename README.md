@@ -176,6 +176,19 @@ After you run the `npm run build` command, your code will be built into a single
 
 In order to deploy your game, you will need to upload *all* of the contents of the `dist` folder to a public facing web server.
 
+### GitHub Pages
+
+This project includes a GitHub Actions workflow in `.github/workflows/deploy-pages.yml` that deploys the contents of `dist` to GitHub Pages on every push to the `main` branch.
+
+To enable it in your repository:
+
+1. Push this project to GitHub.
+2. In the repository settings, open **Pages**.
+3. Set **Source** to **GitHub Actions**.
+4. Push to `main`, or run the workflow manually from the **Actions** tab.
+
+The Vite configuration already uses a relative `base`, so the generated assets work correctly on GitHub Pages project URLs.
+
 ## Customizing the Template
 
 ### Vite
